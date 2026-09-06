@@ -1,5 +1,5 @@
-const DEPLOYMENT_ORDER = "AKfycbxVyz1zUQlCz1wiWX8mhQUpal7G8DwN7E0XfMNztNIRa6chy_19Ns4xodKtwpnXRRql";
-const DEPLOYMENT_RESPONSE = "AKfycbyckDEFaDnLb1V6Tkc5jaKHkH5l8hdQXsyoFzpa8BjaX3OGJfhxIw33g-4EGR0zdP_Q";
+const DEPLOYMENT_ORDER = "AKfycbzXUZf4phFsWAc3vT7OLugRWeVzKyfTOg9SC-iwh23zYBPr6xfuuREFJN8_-UJU9N43";
+const DEPLOYMENT_RESPONSE = "AKfycbzXUZf4phFsWAc3vT7OLugRWeVzKyfTOg9SC-iwh23zYBPr6xfuuREFJN8_-UJU9N43";
 
 
 function buildQS(params) {
@@ -12,13 +12,24 @@ function buildQS(params) {
   return qs.toString();
 }
 
+async function fetchAppsScriptJson(url, options = {}) {
+  const res = await fetch(url, { ...options, redirect: "follow" });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(
+      `HTTP ${res.status}: сервер вернул не JSON. Фрагмент: ${text.slice(0, 300)}`
+    );
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   console.log(msg);
   if (msg.type === "APPS_SCRIPT_GET") {
     const qs = buildQS(msg.params);
     const url = `https://script.google.com/macros/s/${DEPLOYMENT_ORDER}/exec?` + qs.toString();
-    fetch(url, { method: "GET", redirect: "follow" })
-      .then(r => r.json())
+    fetchAppsScriptJson(url)
       .then(data => sendResponse({ ok: true, data }))
       .catch(err => sendResponse({ ok: false, error: String(err) }));
     return true; // важно для async-ответа
@@ -27,8 +38,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "APPS_SCRIPT_GET_RESPONSE") {
     const qs = buildQS(msg.params);
     const url = `https://script.google.com/macros/s/${DEPLOYMENT_RESPONSE}/exec?` + qs.toString();
-    fetch(url, { method: "GET", redirect: "follow" })
-      .then(r => r.json())
+    fetchAppsScriptJson(url)
       .then(data => sendResponse({ ok: true, data }))
       .catch(err => sendResponse({ ok: false, error: String(err) }));
     return true; // важно для async-ответа
@@ -36,13 +46,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === "APPS_SCRIPT_POST") {
     const url = `https://script.google.com/macros/s/${DEPLOYMENT_ORDER}/exec`;
-    fetch(url, {
+    fetchAppsScriptJson(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(msg.body),
-      redirect: "follow"
+      body: JSON.stringify(msg.body)
     })
-      .then(r => r.json())
       .then(data => sendResponse({ ok: true, data }))
       .catch(err => sendResponse({ ok: false, error: String(err) }));
     return true;

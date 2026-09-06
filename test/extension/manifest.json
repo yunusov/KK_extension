@@ -8,6 +8,7 @@
   "background": { "service_worker": "bg.js" },
   "permissions": ["scripting", "activeTab"],
   "host_permissions": [
+    "file:///*",
     "https://script.google.com/*",
     "https://script.googleusercontent.com/*"
   ]

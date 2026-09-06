@@ -1,6 +1,6 @@
 const grabBtn = document.getElementById("transferBtn");
 grabBtn.addEventListener("click",() => {    
-    chrome.tabs.query({active: true}, function(tabs) {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         var tab = tabs[0];
         if (tab) {
             chrome.scripting.executeScript(
@@ -8,7 +8,16 @@ grabBtn.addEventListener("click",() => {
                     target:{tabId: tab.id, allFrames: true},
                     func:grabImages
                 },
-                onResult
+                (frames) => {
+                    // Проверяем ошибку внедрения — иначе молчаливый провал
+                    if (chrome.runtime.lastError) {
+                        console.error("executeScript failed:", chrome.runtime.lastError.message);
+                        alert("Не удалось внедрить скрипт: " + chrome.runtime.lastError.message);
+                        return;
+                    }
+                    // Ошибок нет — обрабатываем результат как раньше
+                    onResult(frames);
+    }
             )
         } else {
             alert("There are no active tabs")
@@ -21,6 +30,8 @@ grabBtn.addEventListener("click",() => {
 })
 
 function grabImages() {
+  console.log("[inject] выполняюсь на", location.href);
+
   function parseOrderDateTime(input, { baseYear } = {}) {
     // 0) Получаем строку (если вдруг прилетел DOM-элемент)
     let str = (typeof input === 'string')
@@ -170,6 +181,9 @@ function grabImages() {
 }
 
 function onResult(frames) {
+  console.log("[onResult] lastError:", chrome.runtime.lastError && chrome.runtime.lastError.message);
+  console.log("[onResult] frames:", frames);
+
   // Если результатов нет
   if (!frames || !frames.length) { 
       alert("Could not retrieve data from specified page");
@@ -186,5 +200,8 @@ function onResult(frames) {
       { type: "APPS_SCRIPT_GET_RESPONSE", params: { secret: "my-token", v: frames[0].result[1] } },
       resp => console.log("GET:", resp)
     );
+  }
+  else {
+    console.log("Карточка не найдена или результат null:", frames);
   }
 }
