@@ -13,7 +13,7 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
    
-  return ContentService.createTextOutput('Hello doGet').setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput(`{ ok:false, error:"unknown msgtype" }`).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
@@ -26,5 +26,5 @@ function doPost(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   } 
      
-  return ContentService.createTextOutput('Hello doPost').setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput(`{ ok:false, error:"unknown msgtype" }`).setMimeType(ContentService.MimeType.JSON);
 }

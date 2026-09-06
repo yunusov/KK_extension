@@ -1,7 +1,16 @@
 const grabBtn = document.getElementById("transferBtn");
+const IDLE_TEXT = "TRANSFER NOW";
+
+function setButtonState(text, disabled) {
+  grabBtn.textContent = text;
+  grabBtn.disabled = disabled;
+}
+
+function resetButton() {
+  setButtonState(IDLE_TEXT, false);
+}
 grabBtn.addEventListener("click",() => {  
-    grabBtn.textContent = "⏳ Обработка...";       // сразу после клика
-    grabBtn.disabled = true;                        // чтобы не нажали повторно
+    setButtonState("⏳ Обработка...", true);
   
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         var tab = tabs[0];
@@ -14,6 +23,7 @@ grabBtn.addEventListener("click",() => {
                 (frames) => {
                     // Проверяем ошибку внедрения — иначе молчаливый провал
                     if (chrome.runtime.lastError) {
+                        resetButton();
                         console.error("executeScript failed:", chrome.runtime.lastError.message);
                         alert("Не удалось внедрить скрипт: " + chrome.runtime.lastError.message);
                         return;
@@ -23,7 +33,8 @@ grabBtn.addEventListener("click",() => {
     }
             )
         } else {
-            alert("There are no active tabs")
+            alert("There are no active tabs");
+            resetButton();
         }
     })
     // chrome.runtime.sendMessage(
@@ -86,9 +97,6 @@ function grabImages() {
     return d;
   }
 
-
-
-
   function getWindowHtml() {
       let windowName = ".ContentStyles__Card-sc-19y55e6-0"
       return document.querySelectorAll(windowName)[0];
@@ -137,7 +145,7 @@ function grabImages() {
 
   function getResponsePrice(windowHtml) {
     let priceClassName = ".order-card-price__container";
-    price_text = windowHtml.querySelectorAll(priceClassName)[0].childNodes[1].textContent
+    price_text = windowHtml.querySelectorAll(priceClassName)[0].childNodes[2].textContent
     const re = /(\d+(?:[\s\u00A0]\d{3})*(?:\.\d{1,2})?)/;
 
     const match = price_text.match(re);
@@ -167,47 +175,54 @@ function grabImages() {
     let orderUrl = getOrderUrl();
     let responsePrice = getResponsePrice(windowHtml);
     let responseRank = getResponseRank(windowHtml);
-    console.log(orderCreatedDate);
     orderName = `${orderCreatedDate.date2} ${orderName}`
     return [
-      [orderCreatedDate.date1, orderName, orderUrl, responseRank - 1, "", review, ""],
-      [orderCreatedDate.date1, orderName, orderUrl, "Профи", "", "", "", "", responsePrice]
+      [orderCreatedDate.date1, orderName, orderUrl, "Профи", "", "", "", "", responsePrice],
+      [orderCreatedDate.date1, orderName, orderUrl, responseRank, "", review, "", "", ""]
     ]
-    console.log(orderName);
-    console.log(orderCreatedDate);
-    console.log(review);
-    console.log(orderUrl);
-    console.log(responsePrice);
-    console.log(responseRank);
   }
+
   return summaryLog();
 }
 
 function onResult(frames) {
   console.log("[onResult] lastError:", chrome.runtime.lastError && chrome.runtime.lastError.message);
+  if (chrome.runtime.lastError) {
+    alert("[onResult] lastError:", chrome.runtime.lastError && chrome.runtime.lastError.message);
+  }
   console.log("[onResult] frames:", frames);
 
   // Если результатов нет
   if (!frames || !frames.length) { 
       alert("Could not retrieve data from specified page");
-      grabBtn.textContent = "TRANSFER NOW";   // вернули исходную
+      resetButton();                          // вернули исходную
       return;
   }
   // alert(frames[0].result);
   // Объединить списки URL из каждого фрейма в один массив
-  if (frames[0].result !== null) {
-    grabBtn.textContent = "✓ Готово";          // данные есть, отправили
-    chrome.runtime.sendMessage(
-      { type: "APPS_SCRIPT_GET", params: { secret: "my-token", v: frames[0].result[0] } },
-      resp => console.log("GET:", resp)
+  if (Array.isArray(frames[0].result)) {
+    setButtonState("✓ Готово", true);
+
+    const p1 = chrome.runtime.sendMessage(
+      { type: "APPS_SCRIPT_GET", params: { secret: "my-token", v: frames[0].result[0] } }
     );
-    chrome.runtime.sendMessage(
-      { type: "APPS_SCRIPT_GET_RESPONSE", params: { secret: "my-token", v: frames[0].result[1] } },
-      resp => console.log("GET:", resp)
+    const p2 = chrome.runtime.sendMessage(
+      { type: "APPS_SCRIPT_GET_RESPONSE", params: { secret: "my-token", v: frames[0].result[1] } }
     );
-  }
-  else {
-    grabBtn.textContent = "✗ Не найдено";      // карточки нет
+
+    // «finally» асинхронного сценария: ждём оба ответа, затем возвращаем кнопку
+    Promise.allSettled([p1, p2]).then(
+      (results) => {
+        results.forEach((r, i) =>
+          console.log(i === 0 ? "GET:" : "GET_RESPONSE:", r.status, r.value ?? r.reason)
+        );
+        setTimeout(resetButton, 1500);
+      }
+    );
+    setTimeout(resetButton, 15000); // страховка от «подвисших» ответов сервера
+  } else {
+    setButtonState("✗ Не найдено", true);
     console.log("Карточка не найдена или результат null:", frames);
+    setTimeout(resetButton, 1500); // даём увидеть статус, затем разблокируем
   }
 }

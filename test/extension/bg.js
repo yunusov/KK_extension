@@ -25,18 +25,15 @@ async function fetchAppsScriptJson(url, options = {}) {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   console.log("msg.type = " + msg.type);
-  const qs = buildQS(msg.params);
+  const qs = buildQS(msg.params ?? {});
   console.log("qs = " + qs.toString());
   const url = `https://script.google.com/macros/s/${DEPLOYMENT_HASH}/exec?msgtype=` + msg.type + `&` + qs.toString();
   console.log("url = " + url);
-  const post_params = {}
-  if (msg.type === "APPS_SCRIPT_POST") {
-    post_params = {
+  const post_params = msg.type === "APPS_SCRIPT_POST" ? {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(msg.body)
-    }
-  }
+    } : {};
   fetchAppsScriptJson(url, post_params)
     .then(data => sendResponse({ ok: true, data }))
     .catch(err => sendResponse({ ok: false, error: String(err) }));
