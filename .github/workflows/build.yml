@@ -1,0 +1,63 @@
+name: Build Extension
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate manifest.json
+        run: jq empty test/extension/manifest.json
+
+      - name: Check JS syntax
+        run: |
+          node --check test/extension/popup.js
+          node --check test/extension/bg.js
+
+      - name: Pack extension (.zip)
+        run: |
+          cd test/extension
+          zip -r ../../kk-extension.zip . -x '*.DS_Store'
+          cd ../..
+          ls -lh kk-extension.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kk-extension
+          path: kk-extension.zip
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kk-extension
+          path: .
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: kk-extension.zip
