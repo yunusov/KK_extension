@@ -1,5 +1,4 @@
-const DEPLOYMENT_ORDER = "AKfycbzXUZf4phFsWAc3vT7OLugRWeVzKyfTOg9SC-iwh23zYBPr6xfuuREFJN8_-UJU9N43";
-const DEPLOYMENT_RESPONSE = "AKfycbzXUZf4phFsWAc3vT7OLugRWeVzKyfTOg9SC-iwh23zYBPr6xfuuREFJN8_-UJU9N43";
+const DEPLOYMENT_HASH = "AKfycbzXGtes8ympH5rFbMlxa8FTPCeEkQ-7wR_TM0kmoTOwlvuviFWUHJiCK9rkbCnONt0x";
 
 
 function buildQS(params) {
@@ -25,36 +24,23 @@ async function fetchAppsScriptJson(url, options = {}) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  console.log(msg);
-  if (msg.type === "APPS_SCRIPT_GET") {
-    const qs = buildQS(msg.params);
-    const url = `https://script.google.com/macros/s/${DEPLOYMENT_ORDER}/exec?` + qs.toString();
-    fetchAppsScriptJson(url)
-      .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: String(err) }));
-    return true; // важно для async-ответа
-  }
-
-  if (msg.type === "APPS_SCRIPT_GET_RESPONSE") {
-    const qs = buildQS(msg.params);
-    const url = `https://script.google.com/macros/s/${DEPLOYMENT_RESPONSE}/exec?` + qs.toString();
-    fetchAppsScriptJson(url)
-      .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: String(err) }));
-    return true; // важно для async-ответа
-  }
-
+  console.log("msg.type = " + msg.type);
+  const qs = buildQS(msg.params);
+  console.log("qs = " + qs.toString());
+  const url = `https://script.google.com/macros/s/${DEPLOYMENT_HASH}/exec?msgtype=` + msg.type + `&` + qs.toString();
+  console.log("url = " + url);
+  const post_params = {}
   if (msg.type === "APPS_SCRIPT_POST") {
-    const url = `https://script.google.com/macros/s/${DEPLOYMENT_ORDER}/exec`;
-    fetchAppsScriptJson(url, {
+    post_params = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(msg.body)
-    })
-      .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: String(err) }));
-    return true;
+    }
   }
+  fetchAppsScriptJson(url, post_params)
+    .then(data => sendResponse({ ok: true, data }))
+    .catch(err => sendResponse({ ok: false, error: String(err) }));
+  return true; // важно для async-ответа
 });
 
 // for test

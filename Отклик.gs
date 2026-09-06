@@ -1,6 +1,6 @@
 const SHEET_NAME_RESPONSE = 'Отклик';
 
-function doGet(e) {
+function response_doGet(e) {
   Logger.log("Отклик doGet");
   const out = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
 

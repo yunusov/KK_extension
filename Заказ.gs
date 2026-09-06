@@ -1,7 +1,7 @@
 const SHEET_NAME = 'Заказ';
 const SECRET = 'my-token';
 
-function doPost(e) {
+function order_doPost(e) {
   const out = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
   try {
     const data = e.postData ? JSON.parse(e.postData.contents) : {};
@@ -31,7 +31,7 @@ function doPost(e) {
   }
 }
 
-function doGet(e) {
+function order_doGet(e) {
   Logger.log("Заказ doGet");
   const out = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
 
