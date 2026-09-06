@@ -1,5 +1,8 @@
 const grabBtn = document.getElementById("transferBtn");
-grabBtn.addEventListener("click",() => {    
+grabBtn.addEventListener("click",() => {  
+    grabBtn.textContent = "⏳ Обработка...";       // сразу после клика
+    grabBtn.disabled = true;                        // чтобы не нажали повторно
+  
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
         var tab = tabs[0];
         if (tab) {
@@ -187,11 +190,13 @@ function onResult(frames) {
   // Если результатов нет
   if (!frames || !frames.length) { 
       alert("Could not retrieve data from specified page");
+      grabBtn.textContent = "TRANSFER NOW";   // вернули исходную
       return;
   }
   // alert(frames[0].result);
   // Объединить списки URL из каждого фрейма в один массив
   if (frames[0].result !== null) {
+    grabBtn.textContent = "✓ Готово";          // данные есть, отправили
     chrome.runtime.sendMessage(
       { type: "APPS_SCRIPT_GET", params: { secret: "my-token", v: frames[0].result[0] } },
       resp => console.log("GET:", resp)
@@ -202,6 +207,7 @@ function onResult(frames) {
     );
   }
   else {
+    grabBtn.textContent = "✗ Не найдено";      // карточки нет
     console.log("Карточка не найдена или результат null:", frames);
   }
 }
