@@ -1,0 +1,14 @@
+{
+  "name": "KK extension",
+  "description": "Super description",
+  "version": "1.0",
+  "manifest_version": 3,
+  "icons": {},
+  "action": { "default_popup": "popup.html" },
+  "background": { "service_worker": "bg.js" },
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": [
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ]
+}
