@@ -9,6 +9,7 @@ function setButtonState(text, disabled) {
 function resetButton() {
   setButtonState(IDLE_TEXT, false);
 }
+
 grabBtn.addEventListener("click",() => {  
     setButtonState("⏳ Обработка...", true);
   
@@ -46,6 +47,10 @@ grabBtn.addEventListener("click",() => {
 function grabImages() {
   console.log("[inject] выполняюсь на", location.href);
 
+  const card = document.querySelector(".order-card__container");
+  if (!card) return null;
+  console.log("[inject] card:", card);
+
   function parseOrderDateTime(input, { baseYear } = {}) {
     // 0) Получаем строку (если вдруг прилетел DOM-элемент)
     let str = (typeof input === 'string')
@@ -74,7 +79,41 @@ function grabImages() {
       'декабрь':11,'декабря':11
     };
 
-    // 3) Гибкий паттерн: … 4 октября в 09:56 (допускаем ":" или "․", любой регистр, юникод)
+    // 3a) Относительная дата: «N минут/часов/дней/недель назад» (без года/месяца)
+    console.log("str = ", str)
+    const mRel = str.match(
+      /(\d+)\s+(секунду?|секунды|секунд|секунда|минуту?|минута|минуты|минут|час|часа|часов|день|дня|дней|неделю?|неделя|недели|недель)\s+назад/iu
+    );
+    const mShort = str.match(/(сегодня|вчера|позавчера)/iu);
+    if (mShort) {
+      const offsetDays = { сегодня: 0, вчера: -1, позавчера: -2 };
+      return new Date(Date.now() + offsetDays[mShort[1].toLowerCase()] * 86400e3);
+    }
+    if (mRel) {
+      const n = parseInt(mRel[1], 10);
+      console.log("mRel n = " + n)
+      const u = mRel[2].toLowerCase();
+      console.log("mRel u = " + u)
+      let ms;
+      if (/^час|^часов/.test(u)) {
+        ms = n * 3600e3;
+      }
+      else if (/^минут/.test(u)) {
+        ms = n * 60e3;
+      }
+      else if (/^дн|^день|^дня/.test(u)) {
+        ms = n * 86400e3;
+      }
+      else if (/^недел/.test(u)) {
+        ms = n * 604800e3;
+      }
+      else {
+        return null;
+      }
+      return new Date(Date.now() - ms);
+    }
+
+    // 3b) Абсолютная дата: «4 октября в 09:56» (допускаем ":" или "․", любой регистр, юникод)
     const re = /(\d{1,2})\s+(январь|января|февраль|февраля|март|марта|апрель|апреля|май|мая|июнь|июня|июль|июля|август|августа|сентябрь|сентября|октябрь|октября|ноябрь|ноября|декабрь|декабря)\s+[вВ]\s+(\d{1,2})[:.](\d{2})/iu;
 
     const m = str.match(re);
@@ -88,7 +127,7 @@ function grabImages() {
     const now = new Date();
     let year = baseYear ?? now.getFullYear();
 
-    const d = new Date(year, month, day, hour, minute); // локальное время (MDN) :contentReference[oaicite:1]{index=1}
+    const d = new Date(year, month, day, hour, minute); // локальное время
 
     // Небольшой «антибудущее» хелпер: если дата получилась в будущем >1 суток — считаем прошлым годом
     if (!baseYear && d.getTime() - now.getTime() > 24*3600*1000) {
@@ -97,39 +136,42 @@ function grabImages() {
     return d;
   }
 
-  function getWindowHtml() {
-      let windowName = ".ContentStyles__Card-sc-19y55e6-0"
-      return document.querySelectorAll(windowName)[0];
-  };
+  // Корень карточки (.order-card__container) выбирается в теле grabImages.
 
-  function getOrderName(windowHtml) {
-      return windowHtml.children[1].children[0].children[0].children[0].textContent
-  };
+  function getOrderName(card) {
+    const el = card.querySelector(".order-card-header__title-container p");
+    return el ? el.textContent.trim() : null;
+  }
 
-  function getOrderCreatedDate(windowHtml) {
-      let content =  windowHtml.querySelectorAll(".order-card-param-subitem-list__element")[0].querySelectorAll("p")[0].textContent
-      console.log(content)
-      dt = parseOrderDateTime(content);
-      console.log(dt);
-      const dd = String(dt.getDate()).padStart(2, '0');
-      const mm = String(dt.getMonth() + 1).padStart(2, '0');
-      const yy = String(dt.getFullYear()).slice(-2);
+  function getOrderCreatedDate(card) {
+    const el = card.querySelector(
+      ".order-card-param-subitem-list__element .order-card-param-subitem__text"
+    );
+    if (!el) {
+      return null;
+    }
+    const dt = parseOrderDateTime(el.textContent)
+    console.log("dt = ", dt)
+    if (!dt) {
+      return null;
+    }
 
-      const dateFmt1 = `${dd}.${mm}.${yy}`;
-      const dateFmt2 = `${yy}.${mm}.${dd}`;
-      return { date1: dateFmt1, date2: dateFmt2 };
-  };
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yy = String(dt.getFullYear()).slice(-2);
+    const dateFmt1 = `${dd}.${mm}.${yy}`;
+    const dateFmt2 = `${yy}.${mm}.${dd}`;
+    return el ? { date1: dateFmt1, date2: dateFmt2 } : null;
+  }
 
-  function getReview(windowHtml) {
-      let value = windowHtml.querySelector(".order-card-client__top-container").querySelector(".CountReviews__CommentsSection-sc-n7wfgq-0")
-      if (value === null) {
-        return false
-      }
-      return true
-  };
+  function getReview(card) {
+    // устойчивый якорь: data-testid, а не хэш-класс
+    return !!card.querySelector('[data-testid="review"]');
+  }
 
   function extractResponseRank(str) {
-    const re = /ваш отклик\s+(\d+)\s*-?й/i;
+    // «ваш отклик 3-й», «ваш отклик: 3», «ваш отклик 17-ий»
+    const re = /ваш\s+отклик\s*[:#№]?\s*(\d+)(?:-?и?й)?/iu;
 
     const match = str.match(re);
     if (!match) {
@@ -139,50 +181,54 @@ function grabImages() {
     return num;
   }
 
-  function getOrderUrl() {
-      return window.location.href
-  }
+  // orderUrl берётся через window.location.href в summaryLog.
 
-  function getResponsePrice(windowHtml) {
-    let priceClassName = ".order-card-price__container";
-    price_text = windowHtml.querySelectorAll(priceClassName)[0].childNodes[2].textContent
-    const re = /(\d+(?:[\s\u00A0]\d{3})*(?:\.\d{1,2})?)/;
-
-    const match = price_text.match(re);
-    if (!match) {
-      return null;
-    }
-    // убираем пробелы внутри чисел, например "1 600" → "1600"
-    const numString = match[1].replace(/[\s\u00A0]/g, '');
+  function getResponsePrice(card) {
+    const el = card.querySelector(".order-card-price__container .order-card-param__text p");
+    if (!el) return null;
+    const m = el.textContent.match(/(\d+(?:[\s\u00A0]\d{3})*(?:[.,]\d{1,2})?)/);
+    if (!m) return null;
+    const numString = m[1].replace(/[\s\u00A0]/g, "").replace(",", ".");
     return parseFloat(numString);
   }
 
-  function getResponseRank(windowHtml) {
-    let text = windowHtml.querySelector(".order-card-additional-info__container").textContent
-    return extractResponseRank(text)
+  function getResponseRank(card) {
+    const el = card.querySelector(".order-card-additional-info__container");
+    return el ? extractResponseRank(el.textContent) : null;
   }
 
-  function summaryLog() {
-    let windowHtml = getWindowHtml();
-    if (!windowHtml) {
-      return null
+  function summaryLog(card) {
+    try {
+      const orderName = getOrderName(card);
+      const orderCreatedDate = getOrderCreatedDate(card);
+      const review = getReview(card);
+      const responsePrice = getResponsePrice(card);
+      const responseRank = getResponseRank(card);
+      const orderUrl = window.location.href;
+
+      let date1 = null, date2 = null;
+      if (orderCreatedDate) {
+        date1 = orderCreatedDate.date1; // ДД.ММ.ГГ
+        date2 = orderCreatedDate.date2; // ГГ.ММ.ДД
+      }
+      else {
+        console.error("[inject] дата не распарсилась (orderCreatedDate = null)");
+      }
+
+      const prefixName = `${date2} ${orderName ?? ""}`;
+      const rank = typeof responseRank === "number" ? responseRank - 1 : "";
+
+      return [
+        [date1, prefixName, orderUrl, "Профи", "", "", "", "", responsePrice],
+        [date1, prefixName, orderUrl, rank, "", review, "", "", ""]
+      ];
+    } catch (err) {
+      console.error("[inject] parse error:", err);
+      return null;
     }
-
-    console.log(windowHtml);
-    let orderName = getOrderName(windowHtml);
-    let orderCreatedDate = getOrderCreatedDate(windowHtml);
-    let review = getReview(windowHtml)
-    let orderUrl = getOrderUrl();
-    let responsePrice = getResponsePrice(windowHtml);
-    let responseRank = getResponseRank(windowHtml);
-    orderName = `${orderCreatedDate.date2} ${orderName}`
-    return [
-      [orderCreatedDate.date1, orderName, orderUrl, "Профи", "", "", "", "", responsePrice],
-      [orderCreatedDate.date1, orderName, orderUrl, responseRank, "", review, "", "", ""]
-    ]
   }
 
-  return summaryLog();
+  return summaryLog(card);
 }
 
 function onResult(frames) {
